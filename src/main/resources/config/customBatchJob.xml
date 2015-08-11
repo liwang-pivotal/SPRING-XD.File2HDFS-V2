@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	   xmlns:batch="http://www.springframework.org/schema/batch"
+	   xmlns:hdp="http://www.springframework.org/schema/hadoop"
+	   xsi:schemaLocation="
+	   		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd 
+	   		http://www.springframework.org/schema/batch http://www.springframework.org/schema/batch/spring-batch.xsd
+	   		http://www.springframework.org/schema/hadoop http://www.springframework.org/schema/hadoop/spring-hadoop.xsd">
+
+	<batch:job id="ioSampleJob">
+		<batch:step id="step1">
+			<batch:tasklet>
+				<batch:chunk reader="itemReader" writer="itemWriter" commit-interval="10"/>
+				<batch:listeners>
+					<batch:listener ref="fileDeletionListener" />
+				</batch:listeners>
+			</batch:tasklet>
+		</batch:step>
+	</batch:job>
+	
+	<bean id="fileDeletionListener" class="org.springframework.xd.dirt.plugins.job.support.listener.FileDeletionStepExecutionListener">
+		<property name="deleteFiles" value="true"/>
+	</bean>
+	
+	<bean id="itemReader" class="org.springframework.batch.item.file.FlatFileItemReader" scope="step">
+		<property name="resource" value="file:///#{jobParameters['absoluteFilePath']}"/>
+		<property name="lineMapper">
+			<bean class="org.springframework.batch.item.file.mapping.PassThroughLineMapper">
+			</bean>
+		</property>
+	</bean>
+	
+	<bean id="itemWriter" class="org.springframework.xd.batch.item.hadoop.HdfsTextItemWriter">
+		<constructor-arg ref="hadoopFs"/>
+		<property name="lineAggregator">
+				<bean class="org.springframework.batch.item.file.transform.PassThroughLineAggregator" />
+		</property>
+		<property name="basePath" value="/xd/"/>
+	</bean>
+	
+	<bean id="hadoopFs" class="org.springframework.data.hadoop.fs.FileSystemFactoryBean">
+		<property name="configuration" ref="hadoopConfiguration"/>
+	</bean>
+	
+	<hdp:configuration register-url-handler="false" properties-location="${xd.config.home}/hadoop.properties">
+		fs.defaultFS=hdfs://localhost:9000
+	</hdp:configuration>
+	
+</beans>
